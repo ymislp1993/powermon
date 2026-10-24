@@ -1,0 +1,12 @@
+powermon
+powermon-data.csv
+*.o
+.DS_Store
+powermon-data.csv
+build
+.mimosa/
+packaging/AppIcon.iconset/
+packaging/AppIcon_1024.png
+packaging/AppIcon.iconset/
+packaging/AppIcon_1024.png
+.DS_Store
