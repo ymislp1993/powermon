@@ -11,6 +11,7 @@ final class LoginToggleState: ObservableObject {
 /// 面板本地 UI 态（@State 的宏在裸 swiftc 下不可用，用 ObservableObject 壳替代）
 final class PanelUiState: ObservableObject {
     @Published var settingsExpanded = false
+    @Published var trendExpanded = false
 }
 
 struct PanelView: View {
@@ -130,19 +131,28 @@ struct PanelView: View {
 
     // MARK: 趋势（F5，画的是 10s EMA 均值线）
 
+    // 趋势折叠（v1.5.3 收纳）：收起=一行摘要（min/max 常显），点开显示折线
     private var trendSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("过去 60 分钟（均值）").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                if let mm = store.trendMinMax {
-                    Text(String(format: "↓%.1f ↑%.1f W", mm.min, mm.max))
-                        .font(.caption2)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { ui.trendExpanded.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: ui.trendExpanded ? "chevron.down" : "chevron.right")
+                    Text("过去 60 分钟（均值）")
+                    Spacer()
+                    if let mm = store.trendMinMax {
+                        Text(String(format: "↓%.1f ↑%.1f W", mm.min, mm.max))
+                            .monospacedDigit()
+                    }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            SparklineView(values: store.trend)
+            .buttonStyle(.borderless)
+            if ui.trendExpanded {
+                SparklineView(values: store.trend)
+            }
         }
     }
 

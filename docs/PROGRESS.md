@@ -52,6 +52,23 @@
   - 已知坑：**@State 在新 SDK 是外部宏，裸 swiftc 找不到 SwiftUIMacros 插件**——View 里用
     ObservableObject 壳（LoginToggleState）替代；评审 B1/B3/B4 已修（requiresApproval 注销、
     status XPC 不进 Binding get、PROGRESS 同步）
+- [x] **v1.5 GLM 额度显示**（2026-10-26，F12）：面板新增 GLM Coding Plan 剩余额度（Pro 档实测：5h 窗口/每周窗口/月度三条）。
+  - 数据源：bigmodel.cn/api/monitor/usage/quota/limit（Bearer = Coding Plan 专用 key，用户手动粘贴）
+  - key 存 ~/Library/Application Support/powermon/plan-key（0600）；面板打开/手动刷新才请求；可清除
+  - baseName 归一化 Unicode 空格（NBSP 等，防进程名匹配失败）；隐私声明更新为"默认全本地，额度查询为可选联网"
+  - 侦察记录：推理响应头无额度字段（Claude 惯例不适用）；/api/biz/plan/usage 需控制台登录态而非 api-key；
+    最终数据源 = 前端懒加载 chunk 1540/3808/1361 里挖出的 /api/monitor/usage/quota/limit
+- [x] **公开发布**（2026-10-24，用户拍板）：https://github.com/ymislp1993/powermon （MIT）
+  - 发布副本流程：/tmp 干净副本——**剔除 recon/（GPL 参考代码隔离）**、.mimosa、图标中间产物，
+    文档清理后单 commit 首发式推送；本地开发仓库继续在原位滚动
+  - README（功能/构建/功耗口径/隐私/致谢）+ LICENSE(MIT) + gh repo create --push
+  - ⚠️ 提交作者邮箱为 android_ym@163.com（公开可见）；后续提交如需隐私可换 GitHub noreply
+- [x] **v1.5.1 面板收纳改版**（2026-10-26，方案 A 落地，commit 4cc2bc4）：用户反馈元素过多。
+  - ui-designer 子代理出三方案视觉稿（可视化目录 ui-collapse-proposals.html），用户拍板 A「分区折叠」
+  - footer 重构：通知/登录自启开关 + 清除 Key + 隐私说明收进「设置」折叠区（默认收起，gearshape 行）；
+    退出常驻设置行右端；采样参数小字行删除
+  - 额度区压缩：查询时间并入标题行、重置时间改 .help() 悬浮、原底部"查询时间+清除 Key"行删除
+  - 面板高度 505→约 465pt；常看区（兽/台词/瓦数/温度/趋势/添柴榜）一字未动
 - [x] **v1.4 添柴榜中文化**（2026-10-19，commit 185a8e6）：本地词典方案（用户拍板，不做联网 AI）。
   - Sources/core/ProcessNameLocalizer.swift：**280 条**人工条目（系统守护进程+常见 App+开发运行时）
   - 词条来源：record.csv 历史 top1 全量去重（279 个）逐条翻译，**回放验证 0 未命中**
