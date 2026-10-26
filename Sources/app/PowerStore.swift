@@ -41,6 +41,7 @@ final class PowerStore: ObservableObject {
     static let hotSustainTicks = 4      // 4 拍（跨度 6s）EMA 持续 >25W 才算"持续"
 
     @Published private(set) var petState: PetState = .sleep
+    @Published private(set) var watts: Double?
     @Published private(set) var speech: String = "刚醒来，看看谁在动…"
     @Published private(set) var isHot = false
     @Published private(set) var detail: String = "采集中…"
@@ -102,6 +103,7 @@ final class PowerStore: ObservableObject {
         }
         // 以下赋值全部带等值守卫（P1）：值不变不发布，避免每拍 ~12 次无效写入引发 SwiftUI/AppKit 失效风暴
         if let r = s.reading {
+            if watts != r.systemWatts { watts = r.systemWatts }
             if detail != r.detail { detail = r.detail }
             if external != r.external { external = r.external }
         } else if detail != "电池数据不可用" {
