@@ -22,7 +22,11 @@ MacBook M3 菜单栏功耗监控。随时回答三个问题：现在整机多少
 | F8 | 降级可用 | SMC/电池任一数据源失败：对应项显示 `--`，其余照常，绝不崩溃退出 |
 | F9 | 高功耗通知（v1.2） | 进入兽喘气态（即 F1 滞回判定成立）时投递**无声横幅**：「持续高功耗 XW · 添柴人在添柴」；10 分钟冷却（投递成功才起算）；面板开关（默认开，UserDefaults 持久化）；授权实时查询——用户事后在系统设置打开授权无需重启生效；固定标识符，后一条顶替前一条（通知中心最多保留一条）|
 | F10 | 登录自启（v1.3） | 面板开关（默认关）；SMAppService.mainApp 注册/注销；建议在 app 装入 /Applications 后使用 |
+数据源 `bigmodel.cn/api/monitor/usage/quota/limit`（Bearer = 用户自己的 Coding Plan API Key）；
+Key 手动粘贴、存本机 0600 文件、面板可清除；面板打开或手动刷新时才请求，默认不配置则零外发 |
 | F11 | 正式安装形态（v1.3） | 自带应用图标；`make install` 装入 /Applications（Spotlight/Launchpad 可见），并自动迁移运行实例 |
+
+| F12 | GLM 额度显示（v1.5，可选联网） | 面板显示 GLM Coding Plan 剩余额度（5 小时窗口/每周窗口/月度，Pro 档实测）；
 
 ## 非目标（明确不做）
 

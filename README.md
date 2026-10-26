@@ -62,8 +62,12 @@ Apple Silicon 没有公开的整机功耗 API，PowerMon 用三条免费（免 s
 
 ## 隐私
 
-**全本地运行**：不联网、不上报、不采集任何数据。历史记录只写入本机
+**默认全本地**：不联网、不上报、不采集。历史记录只写入本机
 `~/Library/Application Support/powermon/`。
+
+唯一的可选联网功能是 **GLM Coding Plan 额度显示**：需手动粘贴自己的智谱 API Key
+（存本机 0600 权限文件），仅访问 `bigmodel.cn` 官方查询接口；不配置则完全零外发，
+面板内可随时清除。
 
 ## 项目结构
 

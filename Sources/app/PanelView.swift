@@ -10,6 +10,7 @@ final class LoginToggleState: ObservableObject {
 
 struct PanelView: View {
     @ObservedObject var store: PowerStore
+    @StateObject private var quota = PlanQuotaStore()
     // 登录自启状态只在面板出现时查一次系统（评审 B3：SMAppService.status 是 XPC 调用，
     // 不放进 Binding get 里随 2s 节拍反复打）。
     // 注意：这里故意不用 @State——新 SDK 里它是外部宏，裸 swiftc 构建找不到 SwiftUIMacros 插件
@@ -24,6 +25,8 @@ struct PanelView: View {
             trendSection
             Divider()
             topSection
+            Divider()
+            quotaSection
             Divider()
             HStack(spacing: 8) {
                 Toggle("通知", isOn: Binding(
@@ -51,7 +54,10 @@ struct PanelView: View {
         }
         .padding(14)
         .frame(width: 320)
-        .onAppear { loginToggle.enabled = LoginItem.isEnabled }
+        .onAppear {
+            loginToggle.enabled = LoginItem.isEnabled
+            quota.refresh()
+        }
     }
 
     // MARK: 功率区（F2）：兽 + 台词气泡 + 口径
@@ -110,6 +116,73 @@ struct PanelView: View {
             }
             SparklineView(values: store.trend)
         }
+    }
+
+    // MARK: GLM 额度（F12，可选联网：需手动配置自己的 API Key；未配置零请求）
+
+    private var quotaSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("GLM Coding Plan\(quota.level.map { " · \($0.uppercased()) 档" } ?? "")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    quota.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.mini)
+                .disabled(quota.isLoading || !quota.isConfigured)
+            }
+            if !quota.isConfigured {
+                HStack(spacing: 6) {
+                    SecureField("粘贴 Coding Plan API Key", text: $quota.keyInput)
+                        .font(.caption)
+                    Button("保存") { quota.saveKey() }
+                        .controlSize(.small)
+                        .disabled(quota.keyInput.trimmingCharacters(in: .whitespaces).count < 20)
+                }
+                Text("开启后查询额度时将访问 bigmodel.cn 官方接口；Key 只存本机，可随时清除")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else if quota.rows.isEmpty {
+                Text(quota.isLoading ? "查询中…" : (quota.status.isEmpty ? "暂无数据" : quota.status))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(quota.rows) { row in
+                    HStack(spacing: 8) {
+                        Text(row.label)
+                            .font(.caption)
+                            .frame(width: 84, alignment: .leading)
+                        ProgressView(value: min(row.percentRemaining, 100) / 100)
+                            .tint(row.percentRemaining < 15 ? Color.red : Color.accentColor)
+                            .frame(maxWidth: .infinity)
+                        Text("\(Int(row.percentRemaining))%")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .frame(width: 34, alignment: .trailing)
+                    }
+                    .help(row.detail.isEmpty ? "" : row.detail)
+                }
+                if !quota.status.isEmpty {
+                    Text(quota.status).font(.caption2).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text(fetchedCaption).font(.caption2).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("清除 Key") { quota.clearKey() }
+                        .controlSize(.mini)
+                        .buttonStyle(.borderless)
+                }
+            }
+        }
+    }
+
+    private var fetchedCaption: String {
+        quota.fetchedAt.map { "查询于 \($0.formatted(date: .omitted, time: .shortened))" } ?? ""
     }
 
     // MARK: 添柴榜（F4）
