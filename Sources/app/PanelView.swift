@@ -229,7 +229,6 @@ struct PanelView: View {
                     Text("\(Int(row.percentRemaining))%")
                         .font(.system(size: 17, weight: .semibold))
                         .monospacedDigit()
-                        .foregroundStyle(row.percentRemaining < 15 ? Color.red : Color.primary)
                     if !row.resetDisplay.isEmpty {
                         Text("· \(row.resetDisplay)")
                             .font(.caption2)
