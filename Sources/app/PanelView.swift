@@ -8,6 +8,11 @@ final class LoginToggleState: ObservableObject {
     @Published var enabled = false
 }
 
+/// 面板本地 UI 态（@State 的宏在裸 swiftc 下不可用，用 ObservableObject 壳替代）
+final class PanelUiState: ObservableObject {
+    @Published var settingsExpanded = false
+}
+
 struct PanelView: View {
     @ObservedObject var store: PowerStore
     @StateObject private var quota = PlanQuotaStore()
@@ -15,6 +20,8 @@ struct PanelView: View {
     // 不放进 Binding get 里随 2s 节拍反复打）。
     // 注意：这里故意不用 @State——新 SDK 里它是外部宏，裸 swiftc 构建找不到 SwiftUIMacros 插件
     @StateObject private var loginToggle = LoginToggleState()
+    // 设置区折叠态（v1.5.1 UI 收纳：低频开关与危险操作收起，默认不展开）
+    @StateObject private var ui = PanelUiState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -28,28 +35,49 @@ struct PanelView: View {
             Divider()
             quotaSection
             Divider()
-            HStack(spacing: 8) {
-                Toggle("通知", isOn: Binding(
-                    get: { store.notifier.isEnabled },
-                    set: { store.notifier.setEnabled($0) }))
-                    .font(.caption2)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                Toggle("登录自启", isOn: Binding(
-                    get: { loginToggle.enabled },
-                    set: { loginToggle.enabled = $0; LoginItem.setEnabled($0) }))
-                    .font(.caption2)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
+            // 设置行（v1.5.1 收纳）：折叠收纳低频开关与清除 Key；退出常驻右端（SPEC F7）
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { ui.settingsExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gearshape")
+                        Text("设置")
+                        Image(systemName: ui.settingsExpanded ? "chevron.down" : "chevron.right")
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
                 Spacer()
                 Button("退出") { NSApp.terminate(nil) }
                     .controlSize(.small)
             }
-            HStack {
-                Text("采样 2s · 记录 10s · 曲线 10s/点")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
+            if ui.settingsExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("高功耗通知", isOn: Binding(
+                        get: { store.notifier.isEnabled },
+                        set: { store.notifier.setEnabled($0) }))
+                        .font(.caption)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                    Toggle("登录自启", isOn: Binding(
+                        get: { loginToggle.enabled },
+                        set: { loginToggle.enabled = $0; LoginItem.setEnabled($0) }))
+                        .font(.caption)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                    HStack {
+                        Button("清除 Key") { quota.clearKey() }
+                            .controlSize(.mini)
+                            .buttonStyle(.borderless)
+                        Spacer()
+                        Text("Key 只存本机（0600），清除后恢复零联网")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.leading, 4)
             }
         }
         .padding(14)
@@ -118,23 +146,30 @@ struct PanelView: View {
         }
     }
 
-    // MARK: GLM 额度（F12，可选联网：需手动配置自己的 API Key；未配置零请求）
+    // MARK: GLM 额度（F12，可选联网；布局对齐智谱控制台「剩余额度」卡片）
 
     private var quotaSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("GLM Coding Plan\(quota.level.map { " · \($0.uppercased()) 档" } ?? "")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("剩余额度")
+                    .font(.system(size: 13, weight: .semibold))
+                    .accessibilityLabel("GLM Coding Plan 剩余额度，\(quota.level.map { $0.uppercased() + " 档" } ?? "未配置")")
                 Spacer()
-                Button {
-                    quota.refresh()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
+                if quota.isConfigured {
+                    Button {
+                        if let url = URL(string: "https://bigmodel.cn/coding-plan/personal/usage") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 2) {
+                            Text("更多")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption2)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderless)
-                .controlSize(.mini)
-                .disabled(quota.isLoading || !quota.isConfigured)
             }
             if !quota.isConfigured {
                 HStack(spacing: 6) {
@@ -152,20 +187,11 @@ struct PanelView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(quota.rows) { row in
-                    HStack(spacing: 8) {
-                        Text(row.label)
-                            .font(.caption)
-                            .frame(width: 84, alignment: .leading)
-                        ProgressView(value: min(row.percentRemaining, 100) / 100)
-                            .tint(row.percentRemaining < 15 ? Color.red : Color.accentColor)
-                            .frame(maxWidth: .infinity)
-                        Text("\(Int(row.percentRemaining))%")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .frame(width: 34, alignment: .trailing)
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(quota.rows) { row in
+                        QuotaColumn(row: row)
                     }
-                    .help(row.detail.isEmpty ? "" : row.detail)
+                    Spacer(minLength: 0)
                 }
                 if !quota.status.isEmpty {
                     Text(quota.status).font(.caption2).foregroundStyle(.secondary)
@@ -184,6 +210,43 @@ struct PanelView: View {
     private var fetchedCaption: String {
         quota.fetchedAt.map { "查询于 \($0.formatted(date: .omitted, time: .shortened))" } ?? ""
     }
+
+    /// 单列额度（控制台同款：小标签 / 大字百分比 · 重置点 / 彩色细进度条）
+    private struct QuotaColumn: View {
+        let row: QuotaLimitRow
+
+        var tint: Color {
+            [Color.blue, Color.green, Color.purple][min(row.tintIndex, 2)]
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(row.label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(Int(row.percentRemaining))%")
+                        .font(.system(size: 17, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(row.percentRemaining < 15 ? Color.red : Color.primary)
+                    if !row.resetDisplay.isEmpty {
+                        Text("· \(row.resetDisplay)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                ProgressView(value: min(row.percentRemaining, 100) / 100)
+                    .tint(tint)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .help(row.percentRemaining >= 0
+                  ? "\(row.label)：剩余 \(Int(row.percentRemaining))%" + (row.resetDisplay.isEmpty ? "" : "，\(row.resetDisplay) 重置")
+                  : row.label)
+        }
+    }
+
 
     // MARK: 添柴榜（F4）
 

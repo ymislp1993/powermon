@@ -51,10 +51,6 @@ enum ProcessNameLocalizer {
 
 
 
-    static func debugProbe2() -> String {
-        let ks = dict.keys.filter { $0.contains("doubao") }.map { Array($0.utf8).map(String.init).joined(separator: ",") }
-        return "doubao 相关键的字节: " + ks.joined(separator: " | ")
-    }
     // MARK: - 词典（key 一律小写纯 ASCII，按字母排序；覆盖本机历史 279 个进程名 0 未命中）
     private static let dict: [String: String] = [
         "": "微信",

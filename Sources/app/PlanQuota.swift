@@ -7,9 +7,10 @@ import Foundation
 
 struct QuotaLimitRow: Identifiable, Equatable {
     let id: String
-    let label: String
+    let label: String                  // 列标签："5 小时" / "每周" / "工具调用"
     let percentRemaining: Double       // 剩余百分比 0-100
-    let detail: String                 // 重置时间 / 剩余量说明
+    let resetDisplay: String           // 重置点：今天显示 HH:mm，其他显示 M月d日
+    let tintIndex: Int                 // 进度条色：0 蓝 / 1 绿 / 2 紫（对齐控制台）
 }
 
 struct QuotaSnapshot: Equatable {
@@ -89,36 +90,44 @@ enum PlanQuotaService {
         let payload = try JSONDecoder().decode(Payload.self, from: data)
         guard let limits = payload.data?.limits else { throw PlanQuotaError.badPayload }
 
-        let rows = limits.map { lim -> QuotaLimitRow in
+        let rows = limits.enumerated().map { index, lim -> QuotaLimitRow in
             let id = "\(lim.type)-\(lim.unit ?? -1)-\(lim.number ?? -1)"
-            // unit 语义（实测）：3=小时、5=月、6=周
-            let unitName = ["", "", "", "小时", "", "月", "周"][min(lim.unit ?? 0, 6)]
+            // 标签与配色对齐控制台设计（M3 + Pro 档 2026-10 实测）：
+            // TOKENS_LIMIT(3,5)=5 小时 / TOKENS_LIMIT(6,1)=每周 / TIME_LIMIT=工具调用
+            let label: String
+            let tint: Int
+            switch (lim.type, lim.unit ?? -1) {
+            case ("TOKENS_LIMIT", 3):
+                label = "\(lim.number ?? 5) 小时"; tint = 0
+            case ("TOKENS_LIMIT", 6):
+                label = "每周"; tint = 1
+            default:
+                label = "工具调用"; tint = 2
+            }
+            // 重置点显示：今天 → HH:mm；其他 → M月d日（对齐控制台）
             let reset: String = {
                 guard let ms = lim.nextResetTime else { return "" }
                 let d = Date(timeIntervalSince1970: ms / 1000)
-                let fmt = DateFormatter()
-                fmt.dateFormat = "MM-dd HH:mm"
-                return fmt.string(from: d)
+                if Calendar.current.isDateInToday(d) {
+                    let f = DateFormatter(); f.dateFormat = "HH:mm"
+                    return f.string(from: d)
+                }
+                let f = DateFormatter()
+                f.dateFormat = "M月d日"
+                return f.string(from: d)
             }()
-            if lim.type == "TIME_LIMIT", let used = lim.currentValue, let total = lim.usage {
-                let remain = lim.remaining ?? max(total - used, 0)
-                let pct = lim.percentage.map { Double($0) }
-                    ?? (total > 0 ? Double(remain) / Double(total) * 100 : 0)
-                return QuotaLimitRow(id: id, label: "月度额度",
-                                     percentRemaining: min(max(pct, 0), 100),
-                                     detail: "剩 \(remain)/\(total) · \(reset) 重置")
+            // 剩余百分比：优先取接口 percentage（即剩余比例）；TIME_LIMIT 用 remaining/usage 兜底
+            let pct: Double
+            if let p = lim.percentage {
+                pct = Double(p)
+            } else if let used = lim.currentValue, let total = lim.usage, total > 0 {
+                pct = Double(total - used) / Double(total) * 100
+            } else {
+                pct = 0
             }
-            // 观测语义（M3 + Pro 档实测）：TOKENS_LIMIT(3,5)=5 小时窗口；TOKENS_LIMIT(6,1)=每周窗口
-            let label: String
-            switch (lim.unit ?? -1, lim.number ?? -1) {
-            case (3, 5): label = "5 小时窗口"
-            case (6, 1): label = "每周窗口"
-            default: label = "\(lim.number ?? 1) \(unitName)窗口"
-            }
-            let pct = lim.percentage.map { Double($0) } ?? 0
             return QuotaLimitRow(id: id, label: label,
                                  percentRemaining: min(max(pct, 0), 100),
-                                 detail: reset.isEmpty ? "" : "\(reset) 重置")
+                                 resetDisplay: reset, tintIndex: tint)
         }
         return QuotaSnapshot(level: payload.data?.level, rows: rows)
     }
